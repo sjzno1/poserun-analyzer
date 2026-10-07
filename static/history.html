@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>历史记录 - PoseRun 跑姿分析系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/common.css" rel="stylesheet">
+</head>
+<body>
+    <script>window.PAGE = 'history';</script>
+
+    <div class="container-fluid">
+        <div class="row justify-content-center">
+            <div class="col-md-11 py-4">
+
+                <!-- 管理员：用户统计 -->
+                <div class="card mb-3" id="adminStatsCard" style="display: none;">
+                    <div class="card-header">
+                        <h5><i class="fas fa-users me-2"></i>各用户历史概览（管理员）</h5>
+                    </div>
+                    <div class="card-body p-2">
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover align-middle mb-0" style="font-size: 0.85rem;">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>用户名</th>
+                                        <th>姓名</th>
+                                        <th>分析次数</th>
+                                        <th>最佳得分</th>
+                                        <th>最近分析</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="adminStatsBody">
+                                    <tr><td colspan="6" class="text-center text-muted py-3">加载中...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 历史记录 -->
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <h5><i class="fas fa-history me-2"></i>跑姿历史记录</h5>
+                        <div class="d-flex align-items-center gap-2">
+                            <input type="search" class="form-control form-control-sm" id="userFilterInput"
+                                   placeholder="按用户名筛选（管理员）" style="max-width: 200px; display: none;">
+                            <span class="text-white small" id="recordCount"></span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted small mb-3">
+                            每次成功分析都会自动记录到数据库。勾选 2-3 条记录可对比历次跑姿变化（按时间从旧到新展示趋势）。
+                        </p>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle" id="historyTable">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 36px;"><input type="checkbox" id="checkAll" title="全选（最多3条）"></th>
+                                        <th>日期</th>
+                                        <th>学员</th>
+                                        <th style="width: 70px;">得分</th>
+                                        <th>步频</th>
+                                        <th>膝盖角度</th>
+                                        <th>小腿角度</th>
+                                        <th>跨步</th>
+                                        <th>对称性</th>
+                                        <th style="min-width: 180px;">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="historyTbody">
+                                    <tr><td colspan="10" class="text-center text-muted py-4">加载中...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="text-center mt-2">
+                            <button class="btn btn-primary" id="compareBtn" disabled>
+                                <i class="fas fa-exchange-alt me-2"></i>对比所选记录
+                            </button>
+                            <span class="text-muted small ms-2" id="compareHint">已选 0 / 3 条</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 对比结果 -->
+                <div class="card mt-3" id="compareCard" style="display: none;">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5><i class="fas fa-chart-line me-2"></i>历史对比</h5>
+                        <button class="btn btn-sm btn-light" id="compareCloseBtn"><i class="fas fa-times"></i></button>
+                    </div>
+                    <div class="card-body">
+                        <div id="compareBody"></div>
+                    </div>
+                </div>
+
+                <!-- 记录详情 -->
+                <div class="card mt-3" id="detailCard" style="display: none;">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5><i class="fas fa-file-alt me-2"></i>记录详情 <span class="text-white" id="detailMeta"></span></h5>
+                        <button class="btn btn-sm btn-light" id="detailCloseBtn"><i class="fas fa-times"></i></button>
+                    </div>
+                    <div class="card-body" id="detailBody"></div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/js/font-awesome.min.js"></script>
+    <script src="/common.js"></script>
+    <script>
+        let records = [];
+        let selectedIds = [];
+        let isAdmin = false;
+        let filterTimer = null;
+
+        // ===== 数据加载 =====
+        function onAuthReady(user) {
+            isAdmin = !!(user && user.role === 'admin');
+            document.getElementById('userFilterInput').style.display = isAdmin ? '' : 'none';
+            if (isAdmin) loadAdminStats();
+            loadRecords();
+        }
+
+        document.getElementById('userFilterInput').addEventListener('input', function () {
+            clearTimeout(filterTimer);
+            filterTimer = setTimeout(loadRecords, 300);
+        });
+
+        document.getElementById('checkAll').addEventListener('change', function (e) {
+            const boxes = document.querySelectorAll('.rec-check');
+            if (e.target.checked) {
+                boxes.forEach(function (b) {
+                    if (selectedIds.length < 3 && b.checked === false) { b.checked = true; selectedIds.push(parseInt(b.value)); }
+                });
+            } else {
+                boxes.forEach(function (b) { b.checked = false; });
+                selectedIds = [];
+            }
+            updateCompareBtn();
+        });
+
+        async function loadRecords() {
+            const tbody = document.getElementById('historyTbody');
+            const search = document.getElementById('userFilterInput').value.trim();
+            try {
+                const url = '/api/history/records' + (isAdmin && search ? '?username=' + encodeURIComponent(search) : '');
+                const resp = await apiFetch(url);
+                const data = await resp.json();
+                if (!resp.ok) { tbody.innerHTML = '<tr><td colspan="9" class="text-center text-danger py-4">' + escapeHtml(data.error || '加载失败') + '</td></tr>'; return; }
+                records = data.records || [];
+                renderRecords();
+            } catch (err) {
+                tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">加载失败</td></tr>';
+            }
+        }
+
+        async function loadAdminStats() {
+            const tbody = document.getElementById('adminStatsBody');
+            try {
+                const resp = await apiFetch('/api/history/users');
+                const data = await resp.json();
+                if (!resp.ok) { tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger py-3">' + escapeHtml(data.error || '加载失败') + '</td></tr>'; return; }
+                tbody.innerHTML = '';
+                const users = data.users || [];
+                if (!users.length) { tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">暂无历史记录</td></tr>'; return; }
+                users.forEach(function (u) {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML =
+                        '<td>' + escapeHtml(u.username) + '</td>' +
+                        '<td>' + escapeHtml(u.user_name || '-') + '</td>' +
+                        '<td>' + u.total + '</td>' +
+                        '<td class="fw-semibold">' + (u.best_score != null ? u.best_score : '-') + '</td>' +
+                        '<td class="text-nowrap">' + escapeHtml(u.latest_at || '-') + '</td>' +
+                        '<td><button class="btn btn-outline-primary btn-xs" onclick="filterByUser(\'' + escapeHtml(u.username) + '\')">查看记录</button></td>';
+                    tbody.appendChild(tr);
+                });
+            } catch (err) { /* 401 已由 apiFetch 处理 */ }
+        }
+
+        function filterByUser(username) {
+            document.getElementById('userFilterInput').value = username;
+            loadRecords();
+            document.getElementById('historyTable').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // ===== 记录表格 =====
+        function renderRecords() {
+            const tbody = document.getElementById('historyTbody');
+            tbody.innerHTML = '';
+            selectedIds = [];
+            document.getElementById('checkAll').checked = false;
+            document.getElementById('recordCount').textContent = '共 ' + records.length + ' 条';
+            if (!records.length) {
+                tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">暂无历史记录，先去上传一段跑步视频吧。</td></tr>';
+                updateCompareBtn();
+                return;
+            }
+            records.forEach(function (r) {
+                const tr = document.createElement('tr');
+                const scoreColor = r.score == null ? '#999' : (r.score < 60 ? '#c00' : (r.score < 80 ? '#c80' : '#080'));
+                const who = isAdmin
+                    ? escapeHtml(r.username || '-') + (r.user_name ? '（' + escapeHtml(r.user_name) + '）' : '')
+                    : escapeHtml(r.user_name || r.username || '-');
+                tr.innerHTML =
+                    '<td><input type="checkbox" class="form-check-input rec-check" value="' + r.id + '"></td>' +
+                    '<td class="text-nowrap">' + escapeHtml(r.created_at || '-') + '</td>' +
+                    '<td>' + who + '</td>' +
+                    '<td style="color:' + scoreColor + ';font-weight:700;">' + (r.score != null ? r.score : '-') + '</td>' +
+                    '<td>' + (r.cadence != null ? r.cadence.toFixed(1) : '-') + '</td>' +
+                    '<td>' + (r.avg_knee != null ? r.avg_knee.toFixed(1) + '°' : '-') + '</td>' +
+                    '<td>' + (r.avg_shin != null ? r.avg_shin.toFixed(1) + '°' : '-') + '</td>' +
+                    '<td>' + escapeHtml(r.stride_level || '-') + '</td>' +
+                    '<td>' + escapeHtml(r.symmetry_level || '-') + '</td>' +
+                    '<td>' +
+                    '<button class="btn btn-outline-primary btn-xs" onclick="showDetail(' + r.id + ')">详情</button>' +
+                    (r.report_file ? '<button class="btn btn-outline-success btn-xs" onclick="downloadReport(' + r.id + ')">报告</button>' : '') +
+                    '<button class="btn btn-outline-danger btn-xs" onclick="doDelete(' + r.id + ')">删除</button>' +
+                    '</td>';
+                tbody.appendChild(tr);
+                tr.querySelector('.rec-check').addEventListener('change', function (e) {
+                    if (e.target.checked) {
+                        if (selectedIds.length >= 3) {
+                            e.target.checked = false;
+                            alert('最多对比 3 条记录');
+                            return;
+                        }
+                        selectedIds.push(r.id);
+                    } else {
+                        selectedIds = selectedIds.filter(function (x) { return x !== r.id; });
+                    }
+                    updateCompareBtn();
+                });
+            });
+            updateCompareBtn();
+        }
+
+        function updateCompareBtn() {
+            document.getElementById('compareBtn').disabled = selectedIds.length < 2;
+            document.getElementById('compareHint').textContent = '已选 ' + selectedIds.length + ' / 3 条';
+        }
+
+        // ===== 对比 =====
+        document.getElementById('compareBtn').addEventListener('click', doCompare);
+        document.getElementById('compareCloseBtn').addEventListener('click', function () {
+            document.getElementById('compareCard').style.display = 'none';
+        });
+
+        async function doCompare() {
+            const card = document.getElementById('compareCard');
+            const body = document.getElementById('compareBody');
+            card.style.display = 'block';
+            body.innerHTML = '<div class="text-center text-muted py-3">对比计算中...</div>';
+            try {
+                const resp = await apiFetch('/api/history/compare', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ record_ids: selectedIds })
+                });
+                const data = await resp.json();
+                if (!resp.ok) { body.innerHTML = '<div class="alert alert-danger">' + escapeHtml(data.error || '对比失败') + '</div>'; return; }
+                renderCompare(data);
+                card.scrollIntoView({ behavior: 'smooth' });
+            } catch (err) {
+                body.innerHTML = '<div class="alert alert-danger">对比失败</div>';
+            }
+        }
+
+        function renderCompare(data) {
+            const body = document.getElementById('compareBody');
+            const recs = data.records; // 旧 → 新
+            const labels = recs.map(function (r, i) {
+                return (r.user_name || r.username || '用户') + ' · ' + (r.created_at || '').split(' ')[0] + '（第' + (i + 1) + '次）';
+            });
+
+            // 数值指标表（含趋势）
+            let html = '<h6 class="text-muted mb-2">关键指标对比（按时间从旧到新）</h6>';
+            html += '<div class="table-responsive"><table class="table table-sm table-bordered align-middle" style="font-size: 0.85rem;">';
+            html += '<thead class="table-light"><tr><th>指标</th>' +
+                labels.map(function (l) { return '<th>' + escapeHtml(l) + '</th>'; }).join('') +
+                '<th>变化趋势</th></tr></thead><tbody>';
+
+            const rows = [
+                ['综合得分', 'score', 1],
+                ['步频', 'cadence', 1],
+                ['膝盖弯曲角度', 'avg_knee', 1],
+                ['小腿角度', 'avg_shin', 1],
+                ['身体前倾角度', 'body_lean', 1],
+                ['跨步程度', 'stride_level', 0],
+                ['对称性', 'symmetry_level', 0]
+            ];
+            rows.forEach(function (row) {
+                const label = row[0], col = row[1], numeric = row[2];
+                const vals = recs.map(function (r) {
+                    const v = r[col];
+                    return (v == null || v === '') ? '-' : (numeric ? v : escapeHtml(v));
+                });
+                let trend = '<span class="text-muted">—</span>';
+                const d = data.deltas && data.deltas[col];
+                if (numeric && d && d.delta != null) {
+                    const up = d.delta > 0, flat = d.delta === 0;
+                    const cls = flat ? 'text-muted' : (up ? 'text-success' : 'text-danger');
+                    const icon = flat ? 'fa-minus' : (up ? 'fa-arrow-up' : 'fa-arrow-down');
+                    trend = '<span class="' + cls + ' fw-semibold"><i class="fas ' + icon + ' me-1"></i>' +
+                        (flat ? '持平' : Math.abs(d.delta).toFixed(1)) + '</span>';
+                }
+                html += '<tr><td class="fw-semibold">' + label + '</td>' +
+                    vals.map(function (v) { return '<td>' + v + '</td>'; }).join('') +
+                    '<td>' + trend + '</td></tr>';
+            });
+            html += '</tbody></table></div>';
+
+            // 各次的问题与建议
+            html += '<h6 class="text-muted mt-3 mb-2">各次问题与建议</h6>';
+            recs.forEach(function (r, i) {
+                html += '<div class="border rounded p-3 mb-2" style="background: rgba(52,152,219,0.04);">';
+                html += '<div class="fw-semibold mb-1">' + escapeHtml(labels[i]) + '　<span class="text-muted small">得分 ' + (r.score != null ? r.score : '-') + '</span></div>';
+                (r.problems || []).forEach(function (p) { html += '<div class="problem-item">• ' + escapeHtml(p) + '</div>'; });
+                (r.suggestions || []).forEach(function (s) { html += '<div class="suggestion-item">✓ ' + escapeHtml(s) + '</div>'; });
+                if (!(r.problems || []).length && !(r.suggestions || []).length) html += '<div class="text-muted small">无</div>';
+                html += '</div>';
+            });
+
+            body.innerHTML = html;
+        }
+
+        // ===== 详情 =====
+        function findRecord(id) {
+            return records.find(function (r) { return r.id === id; }) || null;
+        }
+
+        function showDetail(id) {
+            const r = findRecord(id);
+            if (!r) return;
+            document.getElementById('detailCard').style.display = 'block';
+            document.getElementById('detailMeta').textContent =
+                ' · ' + (r.created_at || '') + (r.username ? ' · 用户 ' + r.username : '');
+            let html = '<div class="row">';
+            html += '<div class="col-md-6">';
+            html += '<div class="metric-item"><span class="metric-label">综合得分:</span><span class="metric-value">' + (r.score != null ? r.score + '（' + escapeHtml(r.grade || '') + '）' : '-') + '</span></div>';
+            html += '<div class="metric-item"><span class="metric-label">步频:</span><span class="metric-value">' + (r.cadence != null ? r.cadence.toFixed(1) + ' 步/分' : '-') + '</span></div>';
+            html += '<div class="metric-item"><span class="metric-label">膝盖弯曲角度:</span><span class="metric-value">' + (r.avg_knee != null ? r.avg_knee.toFixed(1) + '°' : '-') + '</span></div>';
+            html += '<div class="metric-item"><span class="metric-label">小腿角度:</span><span class="metric-value">' + (r.avg_shin != null ? r.avg_shin.toFixed(1) + '°' : '-') + '</span></div>';
+            html += '<div class="metric-item"><span class="metric-label">身体前倾:</span><span class="metric-value">' + (r.body_lean != null ? r.body_lean.toFixed(1) + '°' : '-') + '</span></div>';
+            html += '<div class="metric-item"><span class="metric-label">跨步程度:</span><span class="metric-value">' + escapeHtml(r.stride_level || '-') + '</span></div>';
+            html += '<div class="metric-item"><span class="metric-label">对称性:</span><span class="metric-value">' + escapeHtml(r.symmetry_level || '-') + '</span></div>';
+            html += '<div class="metric-item"><span class="metric-label">跑步阶段:</span><span class="metric-value">' + escapeHtml(r.running_phase || '-') + '</span></div>';
+            const g = (r.metrics && r.metrics.gait) || null;
+            if (g) {
+                html += '<hr style="margin:8px 0;">';
+                html += '<div class="metric-item"><span class="metric-label">垂直振荡:</span><span class="metric-value">' + (g.vertical_oscillation != null ? (g.vertical_oscillation * 100).toFixed(1) + '%（腿长）' : '-') + '</span></div>';
+                html += '<div class="metric-item"><span class="metric-label">平均步幅:</span><span class="metric-value">' + (g.stride_length_m != null ? g.stride_length_m.toFixed(2) + ' m' : '-') + '</span></div>';
+                html += '<div class="metric-item"><span class="metric-label">着地时间:</span><span class="metric-value">' + (g.ground_contact_time_ms != null ? g.ground_contact_time_ms + ' ms' : '-') + '</span></div>';
+                html += '<div class="metric-item"><span class="metric-label">左右步频对称:</span><span class="metric-value">' + (g.step_symmetry != null ? (g.step_symmetry * 100).toFixed(0) + '%' : (g.step_symmetry_level || '-')) + '</span></div>';
+                const sp = g.strike_posture || null;
+                if (sp) {
+                    html += '<div class="metric-item"><span class="metric-label">落地小腿前倾:</span><span class="metric-value">' +
+                        ((sp.left_forward_deg != null ? sp.left_forward_deg + '°' : '-') + ' / ' + (sp.right_forward_deg != null ? sp.right_forward_deg + '°' : '-') + '（左/右）') + '</span></div>';
+                    html += '<div class="metric-item"><span class="metric-label">跨步风险:</span><span class="metric-value">' +
+                        ((sp.over_stride_ratio != null ? (sp.over_stride_ratio * 100).toFixed(0) + '% · ' : '') + (sp.over_stride_level || '-')) + '</span></div>';
+                }
+                if (g.valid_frame_ratio != null) {
+                    html += '<div class="metric-item"><span class="metric-label">可信帧比例:</span><span class="metric-value">' + (g.valid_frame_ratio * 100).toFixed(0) + '%</span></div>';
+                }
+            }
+            html += '</div><div class="col-md-6">';
+            html += '<h6 class="text-danger">主要问题:</h6>';
+            (r.problems || []).forEach(function (p) { html += '<div class="problem-item">• ' + escapeHtml(p) + '</div>'; });
+            if (!(r.problems || []).length) html += '<div class="text-muted small">无</div>';
+            html += '<h6 class="text-success">改进建议:</h6>';
+            (r.suggestions || []).forEach(function (s) { html += '<div class="suggestion-item">✓ ' + escapeHtml(s) + '</div>'; });
+            if (!(r.suggestions || []).length) html += '<div class="text-muted small">无</div>';
+            html += '</div></div>';
+
+            // 关键帧缩略图（最多4张）
+            if (r.keyframes_dir) {
+                html += '<h6 class="text-muted mt-3 mb-2">关键帧截图</h6><div class="row g-2" id="detailKfRow"></div>';
+            }
+            document.getElementById('detailBody').innerHTML = html;
+            if (r.keyframes_dir) {
+                const row = document.getElementById('detailKfRow');
+                for (let i = 1; i <= 4; i++) {
+                    const fname = 'keyframe_' + String(i).padStart(2, '0') + '.jpg';
+                    const col = document.createElement('div');
+                    col.className = 'col-6 col-md-3';
+                    const img = document.createElement('img');
+                    img.className = 'kf-img';
+                    img.loading = 'lazy';
+                    apiFetch('/api/keyframes/' + encodeURIComponent(r.keyframes_dir) + '/' + fname).then(async function (resp) {
+                        if (!resp.ok) { col.style.display = 'none'; return; }
+                        img.src = URL.createObjectURL(await resp.blob());
+                    }).catch(function () { col.style.display = 'none'; });
+                    img.onerror = function () { col.style.display = 'none'; };
+                    col.appendChild(img);
+                    row.appendChild(col);
+                }
+            }
+            document.getElementById('detailCard').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        document.getElementById('detailCloseBtn').addEventListener('click', function () {
+            document.getElementById('detailCard').style.display = 'none';
+        });
+
+        // ===== 报告下载 / 删除 =====
+        async function downloadReport(id) {
+            const r = findRecord(id);
+            if (!r || !r.report_file) return;
+            try {
+                const resp = await apiFetch('/api/report/' + encodeURIComponent(r.report_file));
+                if (!resp.ok) { alert('下载失败'); return; }
+                const url = URL.createObjectURL(await resp.blob());
+                window.open(url, '_blank');
+                setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+            } catch (err) {
+                if (err.message !== 'unauthorized') alert('下载失败，请检查网络连接');
+            }
+        }
+
+        async function doDelete(id) {
+            const r = findRecord(id);
+            if (!r) return;
+            const ok = confirm('确认删除这条历史记录（' + (r.created_at || '') + '）？该操作不可恢复。');
+            if (!ok) return;
+            try {
+                const resp = await apiFetch('/api/history/delete/' + id, { method: 'DELETE' });
+                const data = await resp.json();
+                if (!resp.ok) { alert(data.error || '删除失败'); return; }
+                loadRecords();
+                if (isAdmin) loadAdminStats();
+            } catch (err) { /* 401 已由 apiFetch 处理 */ }
+        }
+    </script>
+</body>
+</html>

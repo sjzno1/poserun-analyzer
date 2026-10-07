@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>分析结果 - PoseRun 跑姿分析系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/common.css" rel="stylesheet">
+</head>
+<body>
+    <script>window.PAGE = 'results';</script>
+
+    <div class="container-fluid">
+        <div class="row justify-content-center">
+            <div class="col-md-8 py-4">
+                <!-- 空状态 -->
+                <div class="card" id="emptyCard">
+                    <div class="card-body text-center py-5 empty-state">
+                        <i class="fas fa-chart-line"></i>
+                        <h5 class="mt-3">暂无分析结果</h5>
+                        <p class="text-muted">还没有进行过跑姿分析，先去上传一段跑步视频吧。</p>
+                        <a class="btn btn-primary" href="/upload.html">
+                            <i class="fas fa-upload me-2"></i>去上传视频
+                        </a>
+                    </div>
+                </div>
+
+                <!-- 结果卡片 -->
+                <div class="card" id="resultsCard" style="display: none;">
+                    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <h5><i class="fas fa-chart-line me-2"></i>分析结果</h5>
+                        <span class="text-white small" id="resultMeta"></span>
+                    </div>
+                    <div class="card-body">
+                        <!-- 综合得分 -->
+                        <div class="score-banner text-center mb-3">
+                            <span class="score-num" id="scoreNum">-</span>
+                            <span class="score-unit">分</span>
+                            <span class="score-grade" id="scoreGrade"></span>
+                        </div>
+
+                        <!-- 逐项评分明细 -->
+                        <div class="mb-3" id="breakdownWrap" style="display: none;">
+                            <h6 class="text-muted mb-2">逐项评分明细</h6>
+                            <table class="table table-sm table-bordered align-middle" style="font-size: 0.85rem;">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>环节</th>
+                                        <th>分项</th>
+                                        <th>评判结果</th>
+                                        <th style="width: 70px;">得分</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="breakdownBody"></tbody>
+                            </table>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="metric-item">
+                                    <span class="metric-label">膝盖弯曲角度:</span>
+                                    <span class="metric-value" id="kneeAngle">-</span>
+                                </div>
+                                <div class="metric-item">
+                                    <span class="metric-label">小腿角度:</span>
+                                    <span class="metric-value" id="shinAngle">-</span>
+                                </div>
+                                <div class="metric-item">
+                                    <span class="metric-label">跨步程度:</span>
+                                    <span class="metric-value" id="strideLevel">-</span>
+                                </div>
+                                <div class="metric-item">
+                                    <span class="metric-label">对称性:</span>
+                                    <span class="metric-value" id="symmetryLevel">-</span>
+                                </div>
+                                <div class="metric-item">
+                                    <span class="metric-label">身体前倾角度:</span>
+                                    <span class="metric-value" id="bodyLeang">-</span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <h6 class="text-danger">主要问题:</h6>
+                                <div id="problemsList"></div>
+                                <h6 class="text-success">改进建议:</h6>
+                                <div id="suggestionsList"></div>
+                            </div>
+                        </div>
+
+                        <!-- 步态指标（步频/垂直振荡/步幅/左右对称） -->
+                        <div class="mt-3" id="gaitWrap" style="display: none;">
+                            <h6 class="text-muted mb-2"><i class="fas fa-running me-1"></i>步态指标</h6>
+                            <div class="row" id="gaitGrid"></div>
+                        </div>
+
+                        <!-- 视频质量检查 -->
+                        <div class="mt-3" id="qualityWrap" style="display: none;">
+                            <h6 class="text-muted mb-2"><i class="fas fa-video me-1"></i>视频质量</h6>
+                            <div id="qualityBody"></div>
+                        </div>
+
+                        <!-- 关键帧截图 -->
+                        <div class="mt-3" id="keyframesWrap" style="display: none;">
+                            <h6 class="text-muted mb-2">关键帧标注截图</h6>
+                            <div class="row g-2" id="keyframesGallery"></div>
+                        </div>
+
+                        <div class="text-center mt-4">
+                            <button class="btn btn-success" id="downloadReportBtn" style="display: none;">
+                                <i class="fas fa-download me-2"></i>下载报告
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/js/font-awesome.min.js"></script>
+    <script src="/common.js"></script>
+    <script>
+        let lastResult = null;
+        try { lastResult = JSON.parse(localStorage.getItem('poserun_last_result') || 'null'); } catch (e) { lastResult = null; }
+
+        function renderGait(gait) {
+            const wrap = document.getElementById('gaitWrap');
+            const grid = document.getElementById('gaitGrid');
+            grid.innerHTML = '';
+            if (!gait) { wrap.style.display = 'none'; return; }
+            const items = [
+                ['步频', gait.cadence != null ? gait.cadence.toFixed(1) + ' 步/分' : '-'],
+                ['步频水平', gait.cadence_level || '-'],
+                ['垂直振荡', gait.vertical_oscillation != null ? (gait.vertical_oscillation * 100).toFixed(1) + '%（腿长）' : '-'],
+                ['平均步幅', gait.stride_length_m != null ? gait.stride_length_m.toFixed(2) + ' m' : '-'],
+                ['着地时间', gait.ground_contact_time_ms != null ? gait.ground_contact_time_ms + ' ms' : '-'],
+                ['支撑比例', gait.stance_ratio != null ? (gait.stance_ratio * 100).toFixed(0) + '%' : '-'],
+                ['左右步频对称', gait.step_symmetry != null ? (gait.step_symmetry * 100).toFixed(0) + '%' : (gait.step_symmetry_level || '-')],
+                ['可信帧比例', gait.valid_frame_ratio != null ? (gait.valid_frame_ratio * 100).toFixed(0) + '%' : '-'],
+            ];
+            const sp = gait.strike_posture || null;
+            if (sp) {
+                items.push(['落地小腿前倾', sp.left_forward_deg != null || sp.right_forward_deg != null
+                    ? (sp.left_forward_deg != null ? sp.left_forward_deg + '°' : '-') + ' / ' + (sp.right_forward_deg != null ? sp.right_forward_deg + '°' : '-') + '（左/右）'
+                    : '-']);
+                items.push(['跨步风险', (sp.over_stride_ratio != null ? (sp.over_stride_ratio * 100).toFixed(0) + '% · ' : '') + (sp.over_stride_level || '-')]);
+            }
+            items.forEach(function (it) {
+                const col = document.createElement('div');
+                col.className = 'col-6 col-md-3';
+                col.innerHTML = '<div class="metric-item"><span class="metric-label">' + it[0] + ':</span>' +
+                    '<span class="metric-value">' + escapeHtml(String(it[1])) + '</span></div>';
+                grid.appendChild(col);
+            });
+            wrap.style.display = 'block';
+        }
+
+        function renderQuality(q) {
+            const wrap = document.getElementById('qualityWrap');
+            const body = document.getElementById('qualityBody');
+            body.innerHTML = '';
+            if (!q) { wrap.style.display = 'none'; return; }
+            let html = '';
+            html += '<div class="row" style="font-size:0.85rem;">';
+            html += '<div class="col-auto">时长: ' + (q.duration != null ? q.duration + 's' : '-') + '</div>';
+            html += '<div class="col-auto">帧率: ' + (q.fps != null ? q.fps + 'fps' : '-') + '</div>';
+            html += '<div class="col-auto">有效帧: ' + (q.valid_frame_ratio != null ? (q.valid_frame_ratio * 100).toFixed(0) + '%' : '-') + '</div>';
+            html += '</div>';
+            (q.warnings || []).forEach(function (w) {
+                html += '<div class="text-warning small">⚠ ' + escapeHtml(w) + '</div>';
+            });
+            (q.reasons || []).forEach(function (r) {
+                html += '<div class="text-danger small">✕ ' + escapeHtml(r) + '</div>';
+            });
+            (q.retake_tips || []).forEach(function (t) {
+                html += '<div class="text-info small">💡 ' + escapeHtml(t) + '</div>';
+            });
+            if (!q.warnings || !q.warnings.length) {
+                if (!q.reasons || !q.reasons.length) {
+                    html += '<div class="text-success small">✓ 视频质量良好，适合分析</div>';
+                }
+            }
+            body.innerHTML = html;
+            wrap.style.display = 'block';
+        }
+
+        function renderKeyframes(data) {
+            const gallery = document.getElementById('keyframesGallery');
+            const wrap = document.getElementById('keyframesWrap');
+            gallery.innerHTML = '';
+
+            if (!data.keyframes_dir) {
+                wrap.style.display = 'none';
+                return;
+            }
+
+            const count = data.keyframes_extracted || 5;
+            let shown = 0;
+            for (let i = 1; i <= count; i++) {
+                const fname = 'keyframe_' + String(i).padStart(2, '0') + '.jpg';
+                const url = '/api/keyframes/' + data.keyframes_dir + '/' + fname;
+                const col = document.createElement('div');
+                col.className = 'col-6 col-md-4';
+                const img = document.createElement('img');
+                img.className = 'kf-img';
+                img.alt = fname;
+                img.loading = 'lazy';
+                // 带鉴权拉取图片（blob），避免 <img> 直连丢失 Authorization 头
+                apiFetch(url).then(async resp => {
+                    if (!resp.ok) throw new Error('http ' + resp.status);
+                    const blob = await resp.blob();
+                    img.src = URL.createObjectURL(blob);
+                }).catch(function () { col.style.display = 'none'; });
+                img.onerror = function () { col.style.display = 'none'; };
+                img.onload = function () {
+                    shown++;
+                    if (shown === 1) wrap.style.display = 'block';
+                };
+                const cap = document.createElement('div');
+                cap.className = 'kf-cap';
+                cap.textContent = '关键帧 ' + i;
+                col.appendChild(img);
+                col.appendChild(cap);
+                gallery.appendChild(col);
+            }
+        }
+
+        function displayResults(data) {
+            document.getElementById('emptyCard').style.display = 'none';
+            document.getElementById('resultsCard').style.display = 'block';
+
+            document.getElementById('resultMeta').textContent =
+                '学员: ' + (data.user_name || '-') +
+                (data.coach_name ? ' | 评估: ' + data.coach_name : '');
+
+            document.getElementById('scoreNum').textContent = data.score;
+            document.getElementById('scoreGrade').textContent = data.grade || '';
+
+            const breakdownBody = document.getElementById('breakdownBody');
+            breakdownBody.innerHTML = '';
+            if (data.score_breakdown && data.score_breakdown.length) {
+                document.getElementById('breakdownWrap').style.display = 'block';
+                data.score_breakdown.forEach(function (b) {
+                    const tr = document.createElement('tr');
+                    const color = b.score < 60 ? '#c00' : (b.score < 80 ? '#c80' : '#080');
+                    tr.innerHTML =
+                        '<td>' + escapeHtml(b.category) + '</td>' +
+                        '<td>' + escapeHtml(b.item) + '</td>' +
+                        '<td>' + escapeHtml(b.result) + '</td>' +
+                        '<td style="color:' + color + ';font-weight:600;">' + b.score + '</td>';
+                    breakdownBody.appendChild(tr);
+                });
+            }
+
+            const m = data.metrics || {};
+            document.getElementById('kneeAngle').textContent = (m.avg_knee_flexion != null ? m.avg_knee_flexion.toFixed(1) : '-') + '°';
+            document.getElementById('shinAngle').textContent = (m.avg_shin_angle != null ? m.avg_shin_angle.toFixed(1) : '-') + '°';
+            document.getElementById('strideLevel').textContent = m.stride_level || '-';
+            document.getElementById('symmetryLevel').textContent = m.symmetry_level || '-';
+            document.getElementById('bodyLeang').textContent = (m.body_leang != null ? m.body_leang.toFixed(1) : '-') + '°';
+
+            renderGait(data.gait || null);
+            renderQuality(data.video_quality || null);
+
+            const problemsList = document.getElementById('problemsList');
+            problemsList.innerHTML = '';
+            (data.problems || []).forEach(function (problem) {
+                const el = document.createElement('div');
+                el.className = 'problem-item';
+                el.textContent = '• ' + problem;
+                problemsList.appendChild(el);
+            });
+
+            const suggestionsList = document.getElementById('suggestionsList');
+            suggestionsList.innerHTML = '';
+            (data.suggestions || []).forEach(function (suggestion) {
+                const el = document.createElement('div');
+                el.className = 'suggestion-item';
+                el.textContent = '✓ ' + suggestion;
+                suggestionsList.appendChild(el);
+            });
+
+            renderKeyframes(data);
+
+            const downloadReportBtn = document.getElementById('downloadReportBtn');
+            if (data.report_file) {
+                downloadReportBtn.style.display = 'inline-block';
+                downloadReportBtn.onclick = async function () {
+                    try {
+                        const resp = await apiFetch('/api/report/' + data.report_file);
+                        if (!resp.ok) { alert('下载失败'); return; }
+                        const blob = await resp.blob();
+                        const url = URL.createObjectURL(blob);
+                        window.open(url, '_blank');
+                        setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+                    } catch (err) {
+                        if (err.message !== 'unauthorized') alert('下载失败，请检查网络连接.');
+                    }
+                };
+            }
+        }
+
+        // 有缓存结果则直接展示
+        if (lastResult && lastResult.status === 'success') {
+            displayResults(lastResult);
+        }
+    </script>
+</body>
+</html>

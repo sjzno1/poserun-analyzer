@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实时分析 - PoseRun 跑姿分析系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/common.css" rel="stylesheet">
+</head>
+<body>
+    <script>window.PAGE = 'camera';</script>
+
+    <div class="container-fluid">
+        <div class="row justify-content-center">
+            <div class="col-md-8 py-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-video me-2"></i>实时摄像头分析</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="text-center mb-3">
+                            <button class="btn btn-primary" id="startCameraBtn">
+                                <i class="fas fa-play me-2"></i>启动摄像头
+                            </button>
+                            <button class="btn btn-danger ms-2" id="stopCameraBtn" style="display: none;">
+                                <i class="fas fa-stop me-2"></i>停止分析
+                            </button>
+                        </div>
+
+                        <div class="video-container" id="cameraContainer" style="display: none;">
+                            <video id="cameraVideo" autoplay playsinline></video>
+                        </div>
+
+                        <div id="cameraStatus" class="text-center mt-3" style="display: none;">
+                            <p class="text-muted">分析中... 按 'q' 键退出，'s' 键截图</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/js/font-awesome.min.js"></script>
+    <script src="/common.js"></script>
+    <script>
+        let cameraStream = null;
+
+        const startCameraBtn = document.getElementById('startCameraBtn');
+        const stopCameraBtn = document.getElementById('stopCameraBtn');
+        const cameraContainer = document.getElementById('cameraContainer');
+        const cameraStatus = document.getElementById('cameraStatus');
+
+        startCameraBtn.addEventListener('click', startCamera);
+        stopCameraBtn.addEventListener('click', stopCamera);
+
+        async function startCamera() {
+            try {
+                cameraStream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        width: 1280,
+                        height: 720,
+                        facingMode: 'user'
+                    }
+                });
+
+                cameraContainer.style.display = 'block';
+                cameraStatus.style.display = 'block';
+                startCameraBtn.style.display = 'none';
+                stopCameraBtn.style.display = 'inline-block';
+
+                const cameraVideo = document.getElementById('cameraVideo');
+                cameraVideo.srcObject = cameraStream;
+
+            } catch (error) {
+                console.error('无法访问摄像头:', error);
+                alert('无法访问摄像头，请检查权限设置.');
+            }
+        }
+
+        function stopCamera() {
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(track => track.stop());
+                cameraStream = null;
+            }
+
+            cameraContainer.style.display = 'none';
+            cameraStatus.style.display = 'none';
+            startCameraBtn.style.display = 'inline-block';
+            stopCameraBtn.style.display = 'none';
+        }
+
+        // 页面卸载时清理摄像头流
+        window.addEventListener('beforeunload', function () {
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(track => track.stop());
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,377 @@
+/* ===== PoseRun 共享样式 v2.2（多页面版） ===== */
+:root {
+    --primary-color: #2c3e50;
+    --accent-color: #3498db;
+    --success-color: #27ae60;
+    --warning-color: #f39c12;
+    --danger-color: #e74c3c;
+}
+
+body {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.navbar {
+    background-color: rgba(255, 255, 255, 0.95) !important;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.navbar-brand {
+    font-weight: bold;
+    color: var(--primary-color) !important;
+    font-size: 1.5rem;
+}
+
+.navbar-brand i {
+    color: var(--accent-color);
+}
+
+.navbar .nav-link {
+    color: var(--primary-color);
+    font-weight: 500;
+}
+
+.navbar .nav-link.active {
+    color: var(--accent-color) !important;
+    font-weight: 700;
+}
+
+.container-fluid {
+    padding-top: 80px;
+}
+
+.card {
+    border: none;
+    border-radius: 15px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+}
+
+.card-header {
+    background-color: var(--primary-color);
+    color: white;
+    border-radius: 15px 15px 0 0 !important;
+    padding: 15px 20px;
+}
+
+.card-header h5 {
+    margin: 0;
+    font-weight: 600;
+}
+
+.upload-area {
+    border: 2px dashed var(--accent-color);
+    border-radius: 10px;
+    padding: 40px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background-color: rgba(52, 152, 219, 0.05);
+}
+
+.upload-area:hover {
+    background-color: rgba(52, 152, 219, 0.1);
+    border-color: #2980b9;
+}
+
+.upload-area i {
+    font-size: 3rem;
+    color: var(--accent-color);
+    margin-bottom: 15px;
+}
+
+.btn-primary {
+    background-color: var(--accent-color);
+    border-color: var(--accent-color);
+    padding: 10px 25px;
+    border-radius: 25px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+    background-color: #2980b9;
+    border-color: #2980b9;
+    transform: translateY(-2px);
+}
+
+.btn-success {
+    background-color: var(--success-color);
+    border-color: var(--success-color);
+    padding: 10px 25px;
+    border-radius: 25px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.btn-success:hover {
+    background-color: #219a52;
+    border-color: #219a52;
+    transform: translateY(-2px);
+}
+
+.metric-item {
+    padding: 15px;
+    border-bottom: 1px solid #eee;
+}
+
+.metric-item:last-child {
+    border-bottom: none;
+}
+
+.metric-label {
+    font-weight: 600;
+    color: var(--primary-color);
+}
+
+.metric-value {
+    float: right;
+    font-weight: 600;
+    color: var(--accent-color);
+}
+
+.progress {
+    height: 10px;
+    border-radius: 5px;
+    background-color: #ecf0f1;
+}
+
+.progress-bar {
+    background-color: var(--accent-color);
+    border-radius: 5px;
+}
+
+.problem-item {
+    color: var(--danger-color);
+    padding: 5px 0;
+}
+
+.suggestion-item {
+    color: var(--success-color);
+    padding: 5px 0;
+}
+
+.score-banner {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 12px;
+    padding: 18px;
+    color: #fff;
+}
+
+.score-num {
+    font-size: 3rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.score-unit {
+    font-size: 1.2rem;
+    margin-left: 4px;
+}
+
+.score-grade {
+    display: block;
+    margin-top: 6px;
+    font-size: 1rem;
+    font-weight: 600;
+    letter-spacing: 2px;
+}
+
+.kf-img {
+    width: 100%;
+    border-radius: 8px;
+    border: 1px solid #e0e0e0;
+}
+
+.kf-cap {
+    font-size: 0.72rem;
+    color: #888;
+    margin-top: 2px;
+}
+
+.video-container {
+    position: relative;
+    background-color: #000;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+#videoPreview {
+    width: 100%;
+    max-height: 500px;
+}
+
+#cameraVideo {
+    width: 100%;
+    max-height: 500px;
+}
+
+.loading-spinner {
+    display: none;
+}
+
+.footer {
+    background-color: rgba(255, 255, 255, 0.9);
+    padding: 20px 0;
+    margin-top: 50px;
+    text-align: center;
+    color: var(--primary-color);
+}
+
+@media (max-width: 768px) {
+    .container-fluid {
+        padding-top: 70px;
+    }
+
+    .upload-area {
+        padding: 20px;
+    }
+}
+
+/* ===== 首页功能卡片 ===== */
+.hero {
+    margin-top: 10px;
+}
+
+.hero h1 {
+    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+}
+
+.feature-card {
+    background: rgba(255, 255, 255, 0.96);
+    border-radius: 15px;
+    padding: 28px 24px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    color: var(--primary-color);
+    height: 100%;
+    display: block;
+}
+
+.feature-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.18);
+    text-decoration: none;
+    color: var(--primary-color);
+}
+
+.feature-card .fc-icon {
+    width: 54px;
+    height: 54px;
+    border-radius: 50%;
+    background: rgba(52, 152, 219, 0.12);
+    color: var(--accent-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    margin-bottom: 14px;
+}
+
+.feature-card h5 {
+    font-weight: 700;
+    color: var(--primary-color);
+}
+
+.feature-card p {
+    color: #666;
+    font-size: 0.9rem;
+    min-height: 56px;
+}
+
+.fc-go {
+    color: var(--accent-color);
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+/* ===== 登录/注册 ===== */
+.auth-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 20px;
+}
+
+.auth-card {
+    width: 100%;
+    max-width: 420px;
+    border-radius: 18px;
+    overflow: hidden;
+    box-shadow: 0 15px 45px rgba(0, 0, 0, 0.3);
+}
+
+.auth-header {
+    background: rgba(44, 62, 80, 0.95);
+    color: #fff;
+    padding: 22px 28px;
+    text-align: center;
+}
+
+.auth-header .auth-logo { font-size: 1.9rem; color: #7fd4ff; }
+.auth-header h4 { margin: 8px 0 2px; font-weight: 700; }
+.auth-header p { margin: 0; font-size: 0.85rem; opacity: 0.75; }
+.auth-body { padding: 26px 28px 30px; }
+.auth-tabs .nav-link {
+    font-weight: 600;
+    color: #666;
+    border: none;
+    border-bottom: 3px solid transparent;
+    border-radius: 0;
+}
+.auth-tabs .nav-link.active {
+    color: var(--accent-color);
+    border-bottom-color: var(--accent-color);
+    background: none;
+}
+#authError {
+    background: #fdecea;
+    color: #c0392b;
+    border: 1px solid #f5c6cb;
+    border-radius: 8px;
+    font-size: 0.88rem;
+}
+.auth-hint { font-size: 0.78rem; color: #999; }
+
+/* ===== 导航用户区 ===== */
+.nav-user .user-name { font-weight: 600; color: var(--primary-color); }
+.badge-admin {
+    background: var(--warning-color);
+    font-size: 0.68rem;
+    vertical-align: middle;
+    margin-left: 4px;
+}
+.badge-user {
+    background: #95a5a6;
+    font-size: 0.68rem;
+    vertical-align: middle;
+    margin-left: 4px;
+}
+
+/* ===== 人员管理 ===== */
+.user-table { font-size: 0.88rem; }
+.user-table th { white-space: nowrap; }
+.btn-xs {
+    padding: 2px 9px;
+    font-size: 0.75rem;
+    border-radius: 12px;
+    margin-right: 4px;
+    white-space: nowrap;
+}
+.role-badge { font-size: 0.72rem; }
+
+/* ===== 空状态 ===== */
+.empty-state i {
+    font-size: 3rem;
+    color: #ccc;
+}

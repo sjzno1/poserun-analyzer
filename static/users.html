@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>人员管理 - PoseRun 跑姿分析系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/common.css" rel="stylesheet">
+</head>
+<body>
+    <script>window.PAGE = 'users';</script>
+
+    <div class="container-fluid">
+        <!-- 非管理员提示 -->
+        <div class="row justify-content-center" id="noAccessRow">
+            <div class="col-md-8 py-4">
+                <div class="card">
+                    <div class="card-body text-center py-5 empty-state">
+                        <i class="fas fa-user-lock"></i>
+                        <h5 class="mt-3">无访问权限</h5>
+                        <p class="text-muted">人员管理仅对管理员开放。</p>
+                        <a class="btn btn-primary" href="/">返回首页</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 人员管理（仅管理员可见） -->
+        <div class="row justify-content-center" id="usersRow" style="display: none;">
+            <div class="col-md-10 py-4">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <h5><i class="fas fa-users-cog me-2"></i>人员管理</h5>
+                        <input type="search" class="form-control form-control-sm" id="userSearchInput"
+                               placeholder="搜索用户名 / 姓名" style="max-width: 220px;">
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted small mb-3">
+                            管理全部用户：调整角色（管理员/普通用户）、启用/禁用账号、重置密码、删除用户。
+                        </p>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle user-table">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>用户名</th>
+                                        <th>姓名</th>
+                                        <th>角色</th>
+                                        <th>状态</th>
+                                        <th>注册时间</th>
+                                        <th>最近登录</th>
+                                        <th style="min-width: 230px;">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="usersTbody">
+                                    <tr><td colspan="8" class="text-center text-muted py-4">加载中...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/js/font-awesome.min.js"></script>
+    <script src="/common.js"></script>
+    <script>
+        const userSearchInput = document.getElementById('userSearchInput');
+        let searchTimer = null;
+        userSearchInput.addEventListener('input', function () {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(loadUsers, 300);
+        });
+
+        function onAuthReady(user) {
+            const isAdmin = user && user.role === 'admin';
+            document.getElementById('noAccessRow').style.display = isAdmin ? 'none' : '';
+            document.getElementById('usersRow').style.display = isAdmin ? '' : 'none';
+            if (isAdmin) loadUsers();
+        }
+
+        async function loadUsers() {
+            const tbody = document.getElementById('usersTbody');
+            const search = userSearchInput.value.trim();
+            try {
+                const resp = await apiFetch('/api/users' + (search ? '?search=' + encodeURIComponent(search) : ''));
+                const data = await resp.json();
+                if (!resp.ok) { tbody.innerHTML = '<tr><td colspan="8" class="text-center text-danger">' + escapeHtml(data.error || '加载失败') + '</td></tr>'; return; }
+                tbody.innerHTML = '';
+                if (!data.users.length) {
+                    tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">暂无用户</td></tr>';
+                    return;
+                }
+                data.users.forEach(function (u) {
+                    const tr = document.createElement('tr');
+                    const self = authUser && authUser.id === u.id;
+                    const roleBadge = u.role === 'admin'
+                        ? '<span class="badge badge-admin">管理员</span>'
+                        : '<span class="badge badge-user">普通用户</span>';
+                    const statusBadge = u.active
+                        ? '<span class="badge bg-success">启用</span>'
+                        : '<span class="badge bg-secondary">禁用</span>';
+                    let actions = '';
+                    if (!self) {
+                        actions += u.role === 'admin'
+                            ? '<button class="btn btn-outline-warning btn-xs" onclick="doToggleRole(' + u.id + ', \'user\')">设为普通</button>'
+                            : '<button class="btn btn-outline-primary btn-xs" onclick="doToggleRole(' + u.id + ', \'admin\')">设为管理员</button>';
+                        actions += u.active
+                            ? '<button class="btn btn-outline-secondary btn-xs" onclick="doToggleActive(' + u.id + ', false)">禁用</button>'
+                            : '<button class="btn btn-outline-success btn-xs" onclick="doToggleActive(' + u.id + ', true)">启用</button>';
+                        actions += '<button class="btn btn-outline-info btn-xs" onclick="doResetPassword(' + u.id + ', \'' + escapeHtml(u.username) + '\')">重置密码</button>';
+                        actions += '<button class="btn btn-outline-danger btn-xs" onclick="doDeleteUser(' + u.id + ', \'' + escapeHtml(u.username) + '\')">删除</button>';
+                    } else {
+                        actions = '<span class="text-muted small">（当前账号）</span>';
+                    }
+                    tr.innerHTML =
+                        '<td>' + u.id + '</td>' +
+                        '<td>' + escapeHtml(u.username) + '</td>' +
+                        '<td>' + escapeHtml(u.name || '-') + '</td>' +
+                        '<td>' + roleBadge + '</td>' +
+                        '<td>' + statusBadge + '</td>' +
+                        '<td class="text-nowrap">' + escapeHtml(u.created_at || '-') + '</td>' +
+                        '<td class="text-nowrap">' + escapeHtml(u.last_login_at || '从未') + '</td>' +
+                        '<td>' + actions + '</td>';
+                    tbody.appendChild(tr);
+                });
+            } catch (err) {
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">加载失败</td></tr>';
+            }
+        }
+
+        async function doToggleRole(uid, newRole) {
+            const ok = confirm(newRole === 'admin'
+                ? '确认将该用户设为管理员？'
+                : '确认取消该用户的管理员权限？');
+            if (!ok) return;
+            await patchUser(uid, { role: newRole });
+        }
+
+        async function doToggleActive(uid, active) {
+            const ok = confirm(active ? '确认启用该账号？' : '确认禁用该账号？禁用后用户将无法登录。');
+            if (!ok) return;
+            await patchUser(uid, { active: active });
+        }
+
+        async function patchUser(uid, fields) {
+            try {
+                const resp = await apiFetch('/api/users/' + uid, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(fields)
+                });
+                const data = await resp.json();
+                if (!resp.ok) { alert(data.error || '操作失败'); return; }
+                loadUsers();
+            } catch (err) { /* 401 已由 apiFetch 处理 */ }
+        }
+
+        async function doResetPassword(uid, username) {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+            let pwd = '';
+            for (let i = 0; i < 12; i++) pwd += chars[Math.floor(Math.random() * chars.length)];
+            const ok = confirm('为 ' + username + ' 生成新密码：' + pwd + '\n\n确认后生效，请妥善告知该用户。');
+            if (!ok) return;
+            try {
+                const resp = await apiFetch('/api/users/' + uid + '/password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: pwd })
+                });
+                const data = await resp.json();
+                if (!resp.ok) { alert(data.error || '重置失败'); return; }
+                alert('密码已重置为：' + pwd);
+            } catch (err) { /* 401 已由 apiFetch 处理 */ }
+        }
+
+        async function doDeleteUser(uid, username) {
+            const ok = confirm('确认删除用户 ' + username + '？该操作不可恢复。');
+            if (!ok) return;
+            try {
+                const resp = await apiFetch('/api/users/' + uid, { method: 'DELETE' });
+                const data = await resp.json();
+                if (!resp.ok) { alert(data.error || '删除失败'); return; }
+                loadUsers();
+            } catch (err) { /* 401 已由 apiFetch 处理 */ }
+        }
+    </script>
+</body>
+</html>

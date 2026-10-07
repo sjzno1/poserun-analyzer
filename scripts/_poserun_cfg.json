@@ -1,0 +1,32 @@
+{
+  "image": "sha256:dce079fb0dd7ae3c7597a6c99dddbec3a4739bc9d10273b52e711bd9e8aa0416",
+  "env": [
+    "FLASK_ENV=production",
+    "ADMIN_USERNAME=admin",
+    "ADMIN_PASSWORD=admin123",
+    "PATH=/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+    "LANG=C.UTF-8",
+    "GPG_KEY=A035C8C19219BA821ECEA86B64E628F8D684696D",
+    "PYTHON_VERSION=3.11.16",
+    "PYTHON_SHA256=91bcdebfdde239a003ae93738a7fce0f9230fee5c4bc2b86f6e6e8c6f98aabe8"
+  ],
+  "binds": [
+    "/share/Container/poserun/uploads:/app/uploads",
+    "/share/Container/poserun/reports:/app/reports",
+    "/share/Container/poserun/data:/app/data"
+  ],
+  "privileged": false,
+  "restart": {
+    "Name": "unless-stopped",
+    "MaximumRetryCount": 0
+  },
+  "cmd": [
+    "python",
+    "app.py"
+  ],
+  "entrypoint": null,
+  "labels": {},
+  "net_name": "qnet-static-eth0-65b9fb",
+  "net_ip": "192.168.3.24",
+  "orig_name": "poserun-analyzer"
+}

@@ -1,0 +1,12 @@
+# PoseRun 依赖
+opencv-python-headless==4.10.0.84
+numpy>=1.24.0
+mediapipe==1.0.1  # 1.x 已移除 mp.solutions 旧API；代码改用 POSE_LANDMARK_NAMES 静态表 + hasattr 守卫，兼容 0.10.14 与 1.x
+python-docx>=0.8.11
+reportlab>=4.0.0  # PDF报告生成（内置中文字体STSong-Light）
+flask>=3.0.0
+flask-cors>=4.0.0
+flask-limiter>=3.0.0  # 请求限流（保护 CPU 密集的分析接口）
+moviepy>=1.0.3
+qdarkstyle>=3.1.0  # 可选GUI支持
+psutil>=5.9.0  # 系统监控
